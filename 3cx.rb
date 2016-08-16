@@ -1,3 +1,7 @@
+# Only tested against, 3cx Version 12.5
+#
+# Make sure to run with the settings.yml file
+#
 require 'mechanize'
 require 'faye/websocket'
 require 'eventmachine'
@@ -5,6 +9,7 @@ require 'permessage_deflate'
 require 'json'
 require 'httparty'
 require 'websocket/extensions'
+require 'mysql'
 
 config_file = ARGV[0]
 settings = YAML.load_file(config_file)
@@ -26,19 +31,28 @@ end
   agent.post "http://#{wallboard_url}/Wallboard/Account/Login.aspx", @params, 'Content-Type' => 'application/x-www-form-urlencoded'
   cookies = agent.cookie_jar.store.map {|i| i}
 EM.run {
-  url="ws://#{wallboard_ws}/Wallboard"
-  ws = Faye::WebSocket::Client.new(url, [], :headers => { 'Cookie' => cookies.join(';')})
-  ws.onopen do |event|
-    ws.send queue.to_json
-  end
-  ws.on :message do |event|
-    p [event.data]
-    if JSON.parse(event.data)["key"] != "KeepAlive"
-      settings["widgets"].each do |widget|
-        puts JSON.parse(JSON.parse(event.data)["value"])["#{widget['wallboard']}"]["Value"]
-        HTTParty.post("http://#{settings['dashing_url']}/widgets/#{widget['name']}",
-          :body => { auth_token: "#{settings['auth_token']}", value: JSON.parse(JSON.parse(event.data)["value"])["#{widget['wallboard']}"]["Value"]}.to_json)
-      end
-    end
-  end
+	url="ws://#{wallboard_ws}/Wallboard"
+	ws = Faye::WebSocket::Client.new(url, [], :headers => { 'Cookie' => cookies.join(';')})
+	
+	ws.on :open do |event|
+		ws.send queue.to_json
+	end
+		
+	ws.on :message do |event|
+		if JSON.parse(event.data)["key"] != "KeepAlive"
+			begin
+			con = Mysql.new settings["mysql_host"], settings["mysql_user"], settings["mysql_pass"], settings["mysql_db"]
+			con.autocommit false
+			
+			# You can add and delete variables here
+			# Run 3cxraw.rb to see all availible varibles from the 3cx wallboard
+			pst = con.prepare "UPDATE wallboard SET avg_talk_time = ?, avg_wait_time = ?, calls_abandoned = ?, calls_answered = ?, calls_serviced_now = ?, calls_waiting = ?, longest_wait_time = ?, timestamp = ? WHERE wallboard_id = 1"
+			pst.execute "#{JSON.parse(JSON.parse(event.data)["value"])["AvTalkTime"]["Value"]}", "#{JSON.parse(JSON.parse(event.data)["value"])["AverageWaitingTime"]["Value"]}", "#{JSON.parse(JSON.parse(event.data)["value"])["Unanswered"]["Value"]}", "#{JSON.parse(JSON.parse(event.data)["value"])["Answered"]["Value"]}", "#{JSON.parse(JSON.parse(event.data)["value"])["CallsServicingNow"]["Value"]}", "#{JSON.parse(JSON.parse(event.data)["value"])["CallsInPoll"]["Value"]}", "#{JSON.parse(JSON.parse(event.data)["value"])["LongestWaitTime"]["Value"]}", "#{Time.now.strftime('%Y-%m-%d %H:%M:%S')}"
+			con.commit
+			
+			ensure
+			con.close if con
+		end
+	end
+end
 }
