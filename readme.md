@@ -1,11 +1,24 @@
-# 3CX Wallboard scrapper for Dashing
+# 3cx Wallboard Websocket
+Connects to the websocket of the 3cx wallboard and writes data to a mysql database
 
-## Why it is needed?
-3CX does not allow to show several queues information on one wallboard.
-This script connects to 3CX wallboard using WebSockets and push data to Dashing using its API.
+## How to run
+I ran this on my CentOS 6 web server, from the command line:
+/path/to/ruby /path/to/3cx.rb /path/to/settings.yml
 
-## How to run script
-All fields in setting.yml file are self explanatory.
-Please note that for every queue you should have separate service and settings file.
-For Wallboard fields have a look here: http://www.3cx.com/blog/wallboard/ (<b>Available Queue Statistics</b> section).
-Widgets itself are not attached, but you can push to (almost) any tipe of widget you like.
+## Other Info
+I am running Ruby 2.1.0 on CentOS 6 (all the latest updates)
+
+Make sure the following Ruby libraries are installed:
+<ul>
+<li>mechanize</li>
+<li>faye-websocket</li>
+<li>eventmachine</li>
+<li>permessage_deflate</li>
+<li>json</li>
+<li>httparty</li>
+<li>websocket-extensions</li>
+<li>mysql</li>
+</ul>
+
+# Credit to <a href="https://github.com/bombergio">bombergio</a>
+## I used his <a href="https://github.com/bombergio/3cx_wallboard_dashing">3cx_wallboard_dashing</a> as a basis for this.
